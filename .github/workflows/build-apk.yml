@@ -49,7 +49,8 @@ jobs:
             gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev \
             python3 python3-setuptools rsync swig unzip zlib1g-dev file curl zstd jq
 
-      - name: 下载 SDK
+      - name: 确定 SDK 版本
+        id: sdk
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -64,22 +65,51 @@ jobs:
           )
           [[ -n "$RELEASE" ]] || { echo '::error::未找到 OpenWrt 25.12 正式版'; exit 1; }
           BASE="https://downloads.openwrt.org/releases/${RELEASE}/targets/${TARGET}/${SUBTARGET}"
-          SDK_ROOT="${RUNNER_TEMP}/pulse-sdk"
-          mkdir -p "$SDK_ROOT"
-          cd "$SDK_ROOT"
-          curl -fSL --retry 3 "$BASE/sha256sums" -o sha256sums
-          SDK_TARBALL=$(awk '{ name=$2; sub(/^\*/, "", name); if (name ~ /^openwrt-sdk-.*\.tar\.zst$/) print name }' sha256sums)
+          SDK_CACHE="${RUNNER_TEMP}/pulse-sdk-download"
+          mkdir -p "$SDK_CACHE"
+          curl -fSL --retry 3 "$BASE/sha256sums" -o "$RUNNER_TEMP/pulse-sdk-sha256sums"
+          SDK_TARBALL=$(awk '{ name=$2; sub(/^\*/, "", name); if (name ~ /^openwrt-sdk-.*\.tar\.zst$/) print name }' "$RUNNER_TEMP/pulse-sdk-sha256sums")
           [[ -n "$SDK_TARBALL" && "$SDK_TARBALL" != *$'\n'* && "$SDK_TARBALL" != */* ]] || {
             echo '::error::无法唯一确定 SDK 文件'; exit 1;
           }
-          curl -fSL --retry 3 "$BASE/$SDK_TARBALL" -o "$SDK_TARBALL"
-          awk -v name="$SDK_TARBALL" '{ file=$2; sub(/^\*/, "", file); if (file == name) print }' sha256sums > sdk.sha256
-          sha256sum -c sdk.sha256
-          tar --zstd -xf "$SDK_TARBALL"
+          SDK_SHA=$(awk -v name="$SDK_TARBALL" '{ file=$2; sub(/^\*/, "", file); if (file == name) print $1 }' "$RUNNER_TEMP/pulse-sdk-sha256sums")
+          [[ "$SDK_SHA" =~ ^[0-9a-f]{64}$ ]]
+          echo "sha256=$SDK_SHA" >> "$GITHUB_OUTPUT"
+          echo "SDK_URL=$BASE/$SDK_TARBALL" >> "$GITHUB_ENV"
+          echo "SDK_TARBALL=$SDK_TARBALL" >> "$GITHUB_ENV"
+          echo "SDK_SHA=$SDK_SHA" >> "$GITHUB_ENV"
+          echo "OpenWrt SDK: ${RELEASE}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 缓存 SDK 压缩包
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/pulse-sdk-download
+          key: pulse-sdk-v1-${{ runner.os }}-${{ env.TARGET }}-${{ env.SUBTARGET }}-${{ steps.sdk.outputs.sha256 }}
+
+      - name: 校验并解压 SDK
+        run: |
+          set -euo pipefail
+          SDK_CACHE="${RUNNER_TEMP}/pulse-sdk-download"
+          SDK_ROOT="${RUNNER_TEMP}/pulse-sdk"
+          mkdir -p "$SDK_CACHE" "$SDK_ROOT"
+          cd "$SDK_CACHE"
+          # 缓存命中也校验官方摘要；缺失或损坏时重新下载。
+          if ! printf '%s  %s\n' "$SDK_SHA" "$SDK_TARBALL" | sha256sum -c -; then
+            curl -fSL --retry 3 "$SDK_URL" -o "$SDK_TARBALL"
+          fi
+          printf '%s  %s\n' "$SDK_SHA" "$SDK_TARBALL" | sha256sum -c -
+          tar --zstd -xf "$SDK_TARBALL" -C "$SDK_ROOT"
           SDK_DIR=$(find "$SDK_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'openwrt-sdk-*' -print)
           [[ -n "$SDK_DIR" && "$SDK_DIR" != *$'\n'* ]]
           echo "SDK_DIR=$SDK_DIR" >> "$GITHUB_ENV"
-          echo "OpenWrt SDK: ${RELEASE}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 缓存依赖源码下载
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.SDK_DIR }}/dl
+          key: pulse-dl-v1-${{ runner.os }}-${{ steps.sdk.outputs.sha256 }}-${{ hashFiles('Makefile', '.github/workflows/build-apk.yml') }}
+          restore-keys: |
+            pulse-dl-v1-${{ runner.os }}-${{ steps.sdk.outputs.sha256 }}-
 
       - name: 构建插件和翻译包
         run: |

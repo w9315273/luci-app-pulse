@@ -6,8 +6,8 @@ LUCI_PKGARCH:=all
 # SDK csstidy drops @supports rules used by the theme.
 LUCI_MINIFY_CSS:=0
 PKG_LICENSE:=MIT
-PKG_VERSION:=1.0.0
-PKG_RELEASE:=3
+PKG_VERSION:=1.0.1
+PKG_RELEASE:=1
 
 define Build/Prepare/luci-app-pulse
 	$(SHELL) $(CURDIR)/generate-version.sh $(PKG_BUILD_DIR)/htdocs/luci-static/resources/view/pulse/index.js

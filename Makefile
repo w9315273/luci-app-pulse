@@ -7,7 +7,7 @@ LUCI_PKGARCH:=all
 LUCI_MINIFY_CSS:=0
 PKG_LICENSE:=MIT
 PKG_VERSION:=1.0.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 define Build/Prepare/luci-app-pulse
 	$(SHELL) $(CURDIR)/generate-version.sh $(PKG_BUILD_DIR)/htdocs/luci-static/resources/view/pulse/index.js

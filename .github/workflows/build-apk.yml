@@ -107,7 +107,10 @@ jobs:
           make defconfig
           for package in luci-app-pulse luci-i18n-pulse-ko luci-i18n-pulse-zh-cn; do
             grep -Eq "^CONFIG_PACKAGE_${package}=(y|m)$" .config || {
-              echo "::error::${package} 未启用"; exit 1;
+              echo "::error::${package} 未启用"
+              grep -n -F "$package" .config tmp/.packageinfo || true
+              sed -n "/^[[:space:]]*config PACKAGE_${package}\$/,/^[[:space:]]*config /p" tmp/.config-package.in
+              exit 1
             }
           done
           make "package/${PKG_DIR_NAME}/compile" -j"$(nproc)" V=sc

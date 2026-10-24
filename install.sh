@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install the latest stable release, including Chinese and Korean translations.
+# Install the latest stable release, including all available translations.
 set -eu
 
 REPO='w9315273/luci-app-pulse'
@@ -27,9 +27,10 @@ asset() {
  printf '%s\n' "$matches"
 }
 fetch "$(asset 'SHA256SUMS')" "$work/SHA256SUMS"
+asset 'luci-app-pulse-[A-Za-z0-9._+~-]+[.]apk' > "$work/packages"
+grep -E "^https://github.com/$REPO/releases/download/[^/]+/luci-i18n-pulse-[A-Za-z0-9._+~-]+[.]apk$" "$work/assets" >> "$work/packages" || true
 set --
-for package in luci-app-pulse luci-i18n-pulse-zh-cn luci-i18n-pulse-ko; do
- url=$(asset "$package-[A-Za-z0-9._+~-]+[.]apk")
+while IFS= read -r url; do
  name=${url##*/}
  echo "Downloading $name..."
  fetch "$url" "$work/$name"
@@ -39,7 +40,7 @@ for package in luci-app-pulse luci-i18n-pulse-zh-cn luci-i18n-pulse-ko; do
  case "$checksum" in *[!0-9a-fA-F]*) fail "Invalid checksum: $name" ;; esac
  printf '%s  %s\n' "$checksum" "$work/$name" | sha256sum -c - || fail "Checksum mismatch: $name"
  set -- "$@" "$work/$name"
-done
+done < "$work/packages"
 
 echo 'Installing Pulse...'
 apk add --allow-untrusted "$@"

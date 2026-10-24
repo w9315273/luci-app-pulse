@@ -12,3 +12,5 @@ define Build/Prepare/luci-app-pulse
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
+
+# call BuildPackage - OpenWrt buildroot signature

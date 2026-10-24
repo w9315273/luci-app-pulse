@@ -10,7 +10,7 @@
 uclient-fetch -O /tmp/install-pulse.sh https://raw.githubusercontent.com/w9315273/luci-app-pulse/main/install.sh && sh /tmp/install-pulse.sh
 ```
 
-![Pulse 대시보드](docs/screenshot-ko.png)
+![Pulse 대시보드](screenshot-ko.png)
 
 ## 기능
 

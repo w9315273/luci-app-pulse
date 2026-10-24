@@ -10,7 +10,7 @@ Install the latest release:
 uclient-fetch -O /tmp/install-pulse.sh https://raw.githubusercontent.com/w9315273/luci-app-pulse/main/install.sh && sh /tmp/install-pulse.sh
 ```
 
-![Pulse dashboard](docs/screenshot-en.png)
+![Pulse dashboard](screenshot-en.png)
 
 ## Features
 

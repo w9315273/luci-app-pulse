@@ -129,11 +129,32 @@ jobs:
           cd "$GITHUB_WORKSPACE/dist"
           sha256sum ./*.apk > SHA256SUMS
 
-      - name: 上传产物
+      - name: 上传主包
         uses: actions/upload-artifact@v7
         with:
-          name: pulse-apk-${{ github.ref_name }}-${{ github.run_number }}
-          path: dist/*
+          path: dist/luci-app-pulse-*.apk
+          archive: false
+          if-no-files-found: error
+
+      - name: 上传中文翻译包
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/luci-i18n-pulse-zh-cn-*.apk
+          archive: false
+          if-no-files-found: error
+
+      - name: 上传韩文翻译包
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/luci-i18n-pulse-ko-*.apk
+          archive: false
+          if-no-files-found: error
+
+      - name: 上传校验文件
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/SHA256SUMS
+          archive: false
           if-no-files-found: error
 
       - name: 发布到 Releases

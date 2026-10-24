@@ -184,14 +184,15 @@ jobs:
             const fs = require('node:fs/promises');
             const path = require('node:path');
             const { execFileSync } = require('node:child_process');
-            const { createRequire } = require('node:module');
             const { pathToFileURL } = require('node:url');
             // Same official SDK used by upload-artifact v7; each file stays unarchived.
             const tools = path.join(process.env.RUNNER_TEMP, 'pulse-artifact-tools');
             execFileSync('npm', ['install', '--prefix', tools, '--no-audit', '--no-fund',
               '--ignore-scripts', '@actions/artifact@6.3.1'], { stdio: 'inherit' });
-            const resolve = createRequire(path.join(tools, 'package.json'));
-            const { DefaultArtifactClient } = await import(pathToFileURL(resolve.resolve('@actions/artifact')).href);
+            // Resolve the SDK through its public ESM export from beside node_modules.
+            const loader = path.join(tools, 'artifact-loader.mjs');
+            await fs.writeFile(loader, "export { DefaultArtifactClient } from '@actions/artifact';\n");
+            const { DefaultArtifactClient } = await import(pathToFileURL(loader).href);
             const client = new DefaultArtifactClient();
             const directory = path.join(process.env.GITHUB_WORKSPACE, 'dist');
             const files = (await fs.readdir(directory)).filter(name => name.endsWith('.apk') || name === 'SHA256SUMS').sort();

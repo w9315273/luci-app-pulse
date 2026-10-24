@@ -10,7 +10,7 @@
 uclient-fetch -O /tmp/install-pulse.sh https://raw.githubusercontent.com/w9315273/luci-app-pulse/main/install.sh && sh /tmp/install-pulse.sh
 ```
 
-![Pulse 仪表盘](docs/screenshot-zh-cn.png)
+![Pulse 仪表盘](screenshot-zh-cn.png)
 
 ## 功能
 

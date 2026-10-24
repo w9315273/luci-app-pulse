@@ -317,3 +317,12 @@
 /* Scope the Argon icon override to this plugin's menu entry. */
 .main-left .nav > li > a[href$="/admin/dashboard"]:first-child .menu-icon,
 .main-left .nav > li > a[href$="/admin/dashboard"]:first-child::before {color:#3b82f6}
+
+/* Shared list geometry keeps port and container separators aligned. */
+.hd .hd-ports-card > .hd-card-head,
+.hd .hd-docker-card > .hd-card-head {height:56px;min-height:56px;align-content:flex-start}
+.hd .hd-port,
+.hd .hd-container {height:48px;min-height:48px;padding:10px 0;display:flex;align-items:center;border-bottom:1px solid var(--hd-line)}
+.hd .hd-port > .hd-port-heading {width:100%;min-width:0}
+.hd .hd-port:last-child,
+.hd .hd-container:last-child {border-bottom:1px solid transparent}

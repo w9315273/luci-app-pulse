@@ -150,7 +150,7 @@ msgid "IP address copied"
 msgstr ""
 
 msgctxt "pulse"
-msgid "Last 5 minutes"
+msgid "Last 1 minute"
 msgstr ""
 
 msgctxt "pulse"

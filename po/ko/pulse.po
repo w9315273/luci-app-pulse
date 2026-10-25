@@ -152,8 +152,8 @@ msgid "IP address copied"
 msgstr "IP 주소 복사됨"
 
 msgctxt "pulse"
-msgid "Last 5 minutes"
-msgstr "최근 5분"
+msgid "Last 1 minute"
+msgstr "최근 1분"
 
 msgctxt "pulse"
 msgid "Limit %s · Used %s"

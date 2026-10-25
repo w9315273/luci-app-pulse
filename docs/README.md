@@ -14,7 +14,7 @@ uclient-fetch -O /tmp/install-pulse.sh https://raw.githubusercontent.com/w931527
 
 ## Features
 
-- Live network traffic with a one-minute chart
+- Live network traffic with a five-minute chart
 - CPU, memory, temperature, connections, and disk usage
 - Ethernet link status, negotiated speed, IP addresses, and DNS
 - Docker container status (optional)
@@ -23,6 +23,6 @@ uclient-fetch -O /tmp/install-pulse.sh https://raw.githubusercontent.com/w931527
 > [!NOTE]
 > - **Sampling:** Network traffic is sampled every second; system metrics and the page update every two seconds. The last five minutes are stored in memory. Collection continues when the page is closed; restarting the router or collector clears the history.
 > - **Interfaces:** Automatic selection prioritizes WAN; devices can also be selected manually. A physical device reports its total traffic, while a virtual device reports its own traffic. Upload is TX and download is RX; on LAN devices, these directions may be opposite to the client's perspective.
-> - **Device totals:** Values come from the selected device's counters. They are not limited to the chart’s time window and are not daily or monthly totals. They reset when the device is recreated or its counters reset.
+> - **Device totals:** Values come from the selected device's counters. They are not limited to the last five minutes and are not daily or monthly totals. They reset when the device is recreated or its counters reset.
 > - **Connection status:** Indicates link status, not Internet connectivity.
 > - **Conditional display:** Temperature appears when a reading is available. Disk cards show the root filesystem and detect additional mounted disks. Docker status is shown when available and is read-only; Docker is not required to use Pulse.

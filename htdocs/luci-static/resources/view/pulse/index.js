@@ -81,7 +81,7 @@ function loadTraffic(data){
 }
 // Generated from Makefile; generate-version.sh refreshes this on build/deploy.
 var VERSION='1.0.1'; // @pulse-version
-var NS='http://www.w3.org/2000/svg', WINDOW_MS=5*60*1000;
+var NS='http://www.w3.org/2000/svg', WINDOW_MS=5*60*1000, TRAFFIC_WINDOW_MS=1*60*1000;
 function svg(tag, attrs) { var n=document.createElementNS(NS,tag); Object.keys(attrs||{}).forEach(function(k){n.setAttribute(k,attrs[k]);}); return n; }
 function bytes(v) { if(v==null||!isFinite(v)) return '—'; var u=['B','KB','MB','GB','TB'],i=0; while(v>=1024&&i<4){v/=1024;i++;} return (v<10&&i?v.toFixed(2):v<100&&i?v.toFixed(1):Math.round(v))+' '+u[i]; }
 function rate(v){return v==null?_('Sampling','pulse'):bytes(v)+'/s';}
@@ -149,30 +149,34 @@ function sortPorts(names,devices,interfaces) {
  return names.slice().sort(function(a,b){return ranks[a]-ranks[b]||a.localeCompare(b,'en',{numeric:true});});
 }
 function trafficScale(peak) {
- var units=['B/s','KB/s','MB/s','GB/s','TB/s'],unit=0,divisor=1;
+ var units=['MB/s','GB/s','TB/s'],unit=0,divisor=1024*1024;
  while(peak/divisor>=1024&&unit<units.length-1){unit++;divisor*=1024;}
- var raw=Math.max(unit===0?1:0.001,peak/divisor*1.15/4);
- var power=Math.pow(10,Math.floor(Math.log10(raw)));
- var step=([1,2,2.5,5,10].find(function(n){return n*power>=raw;})||10)*power;
- return {ceiling:step*4*divisor,step:step,unit:units[unit]};
+ var value=peak/divisor;
+ if(unit===0&&value<=4)return {ceiling:4*divisor,step:1,ticks:4,unit:units[unit]};
+ var raw=Math.max(1,value/6),power=Math.pow(10,Math.floor(Math.log10(raw)));
+ var step=Math.ceil(([1,2,2.5,5,10].find(function(n){return n*power>=raw;})||10)*power);
+ var ticks=Math.max(4,Math.ceil(value*1.02/step));
+ return {ceiling:step*ticks*divisor,step:step,ticks:ticks,unit:units[unit]};
 }
-function smoothTraffic(samples) {
- // Trailing nine seconds, weighted by actual interval length. Never bridge missing samples.
- return samples.map(function(sample,i){
-  var result=Object.assign({},sample);
-  ['up','down'].forEach(function(key){
-   var remaining=9,total=0,duration=0;
-   for(var j=i;j>=0&&remaining>0;j--){
-    var point=samples[j];
-    if(!Number.isFinite(point[key])||!Number.isFinite(point.interval)||point.interval<=0||point.interval>10)break;
-    if(j<i&&samples[j+1].t-point.t>samples[j+1].interval*1000+1000)break;
-    var weight=Math.min(remaining,point.interval);
-    total+=point[key]*weight;duration+=weight;remaining-=weight;
-   }
-   result[key]=duration?total/duration:null;
+function visualTraffic(samples) {
+ // Centered three-point filter for drawing only; never modify measured samples.
+ var result=samples.map(function(s){return Object.assign({},s);});
+ ['up','down'].forEach(function(key){
+  function valid(s){return Number.isFinite(s[key])&&s[key]>=0;}
+  function connected(a,b){return b.t>a.t&&b.t-a.t<=Math.min(2500,(b.interval||1)*1000+1000);}
+  samples.forEach(function(sample,i){
+   if(!valid(sample)){result[i][key]=null;return;}
+   var total=sample[key]*2,weight=2;
+   [-1,1].forEach(function(direction){
+    var j=i+direction;
+    if(j<0||j>=samples.length||!valid(samples[j]))return;
+    if(!connected(samples[Math.min(i,j)],samples[Math.max(i,j)]))return;
+    total+=samples[j][key];weight++;
+   });
+   result[i][key]=total/weight;
   });
-  return result;
  });
+ return result;
 }
 function trafficPeak(samples,key) {
  var peak=null;
@@ -185,7 +189,7 @@ function markTrafficPeak(host,samples,ceiling) {
  var peaks=['up','down'].map(function(key){return trafficPeak(samples,key);}).filter(Boolean);
  var positions=[];
  peaks.forEach(function(peak){
-  var x=100*(1-(samples[samples.length-1].t-peak.t)/WINDOW_MS),y=(175-165*peak.value/ceiling)/180*100;
+  var x=100*(1-(samples[samples.length-1].t-peak.t)/TRAFFIC_WINDOW_MS),y=(175-165*peak.value/ceiling)/180*100;
   var color=peak.key==='up'?'var(--hd-secondary)':'var(--hd-blue)',offset='';
   if(positions.some(function(p){return Math.abs(p.x-x)*(host.clientWidth||650)/100<140&&Math.abs(p.y-y)*(host.clientHeight||180)/100<28;}))
    offset=y<80?';transform:translateY(8px)':';transform:translateY(calc(-100% - 32px))';
@@ -226,9 +230,9 @@ function plot(host, samples, keys, colors, id, percent){
  host.replaceChildren();var w=800,h=180, ceiling=percent?100:Math.max(1,Math.max.apply(null,keys.map(function(k){return max(samples,k);}))*1.15);
  var root=svg('svg',{viewBox:'0 0 '+w+' '+h,preserveAspectRatio:'none','aria-hidden':'true'}),defs=svg('defs');root.appendChild(defs);
  var scale=null;if(keys.length>1){scale=trafficScale(Math.max.apply(null,keys.map(function(k){return max(samples,k);})) );ceiling=scale.ceiling;}
- if(keys.length>1)for(var j=0;j<=4;j++)root.appendChild(svg('line',{x1:0,y1:10+j*165/4,x2:w,y2:10+j*165/4,stroke:'var(--hd-line)','stroke-dasharray':'3 5','stroke-width':1}));
+ if(keys.length>1)for(var j=0;j<=scale.ticks;j++)root.appendChild(svg('line',{x1:0,y1:10+j*165/scale.ticks,x2:w,y2:10+j*165/scale.ticks,stroke:'var(--hd-line)','stroke-dasharray':'3 5','stroke-width':1}));
  keys.forEach(function(k,idx){var g=svg('linearGradient',{id:id+idx,x1:0,y1:0,x2:0,y2:1});g.appendChild(svg('stop',{offset:'0%','stop-color':colors[idx],'stop-opacity':'.27'}));g.appendChild(svg('stop',{offset:'100%','stop-color':colors[idx],'stop-opacity':'.015'}));defs.appendChild(g);
- var segments=[],seg=[];samples.forEach(function(s,i){if(s[k]==null){if(seg.length)segments.push(seg);seg=[];return;}seg.push([w*(1-(samples[samples.length-1].t-s.t)/WINDOW_MS),h-5-(h-15)*Math.min(1,s[k]/ceiling)]);});if(seg.length)segments.push(seg);
+ var segments=[],seg=[];samples.forEach(function(s,i){if(s[k]==null){if(seg.length)segments.push(seg);seg=[];return;}seg.push([w*(1-(samples[samples.length-1].t-s.t)/(id==='hd-main'?TRAFFIC_WINDOW_MS:WINDOW_MS)),h-5-(h-15)*Math.min(1,s[k]/ceiling)]);});if(seg.length)segments.push(seg);
  segments.forEach(function(a){var d=id==='hd-main'?smoothPath(a):a.map(function(p,i){return(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');root.appendChild(svg('path',{d:d+' L'+a[a.length-1][0]+','+h+' L'+a[0][0]+','+h+' Z',fill:'url(#'+id+idx+')'}));root.appendChild(svg('path',{d:d,fill:'none',stroke:colors[idx],'stroke-width':1.7,'vector-effect':'non-scaling-stroke','stroke-linejoin':'round'}));});
  });host.appendChild(root);return scale||ceiling;
 }
@@ -236,7 +240,7 @@ return view.extend({
  handleSaveApply:null,handleSave:null,handleReset:null,
  load:function(){return Promise.all([devicesRPC(),interfacesRPC(),infoRPC(),boardRPC(),Promise.resolve(''),L.resolveDefault(fs.read('/etc/resolv.conf'),''),L.resolveDefault(loadStorage(),null),Promise.resolve({}),Promise.resolve(null),loadPorts()]).then(loadTraffic);},
  render:function(data){
- var history=[],flow=[],choice=prefs(),selected='',latest=data, refs={},storageFetched=Date.now(),optionSignature='';
+ var history=[],flow=[],drawFlow=[],choice=prefs(),selected='',latest=data, refs={},storageFetched=Date.now(),optionSignature='';
  var select=E('select',{'aria-label':_('Monitored network device','pulse')});
  function syncSelection(devices,interfaces) {
   var names=visibleDeviceNames(devices);
@@ -358,10 +362,10 @@ return view.extend({
  function hideHover(){hoverTime=null;tooltip.hidden=true;guide.hidden=true;hoverDots.forEach(function(dot){dot.hidden=true;});}
  function renderHover(){
   if(hoverTime==null)return;
-  var sample=flow.find(function(s){return s.t===hoverTime;});
+  var sample=drawFlow.find(function(s){return s.t===hoverTime;});
   if(!sample||!['up','down'].some(function(k){return Number.isFinite(sample[k]);})){hideHover();return;}
   var box=canvas.getBoundingClientRect(),outer=big.getBoundingClientRect();
-  var x=box.left-outer.left+box.width*(1-(flow[flow.length-1].t-sample.t)/WINDOW_MS);
+  var x=box.left-outer.left+box.width*(1-(flow[flow.length-1].t-sample.t)/TRAFFIC_WINDOW_MS);
   guide.hidden=false;guide.style.left=x+'px';
   ['up','down'].forEach(function(key,i){var dot=hoverDots[i];dot.hidden=!Number.isFinite(sample[key]);if(dot.hidden)return;
    dot.style.left=x+'px';dot.style.top=(box.top-outer.top+box.height*(175-165*sample[key]/hoverCeiling)/180)+'px';
@@ -433,7 +437,7 @@ return view.extend({
  E('div',{class:'hd-grid hd-middle'},[
  E('section',{class:'hd-card hd-flow-card'},[
   E('div',{class:'hd-card-head'},[
-   E('div',{class:'hd-flow-heading'},[E('h3',{},_('Network traffic','pulse')),E('div',{class:'hd-flow-controls'},[field('chartSub','hd-sub',_('Last 5 minutes','pulse'))])]),
+   E('div',{class:'hd-flow-heading'},[E('h3',{},_('Network traffic','pulse')),E('div',{class:'hd-flow-controls'},[field('chartSub','hd-sub',_('Last 1 minute','pulse'))])]),
    E('div',{class:'hd-flow-summary'},[
     E('div',{class:'hd-legend'},[E('span',{class:'hd-gray'},['↑ '+_('Up','pulse')+' ',field('upLegend','','—')]),E('span',{class:'hd-blue'},['↓ '+_('Down','pulse')+' ',field('downLegend','','—')])])])
   ]),big,E('div',{class:'hd-axis'},[field('start','',_('Sampling started','pulse')),field('end','',_('Now','pulse'))])]),
@@ -448,8 +452,9 @@ return view.extend({
  updateDocker(d[11]);
  latest=d;syncSelection(d[0],d[1]);var devices=d[0],ifs=d[1],info=d[2],dev=devices[selected],now=Date.now();
  var traffic=d[10],flowNow=traffic&&traffic.now||now;
- flow=traffic&&traffic.device===selected&&Array.isArray(traffic.samples)?smoothTraffic(traffic.samples).filter(function(s){return s.t>=flowNow-WINDOW_MS;}):[];
- var live=flow.length&&flowNow-flow[flow.length-1].t<=10000?flow[flow.length-1]:{};
+ flow=traffic&&traffic.device===selected&&Array.isArray(traffic.samples)?traffic.samples.filter(function(s){return s.t>=flowNow-TRAFFIC_WINDOW_MS;}):[];
+ var rawFlow=traffic&&traffic.device===selected&&Array.isArray(traffic.samples)?traffic.samples:[];
+ var live=rawFlow.length&&flowNow-rawFlow[rawFlow.length-1].t<=10000?rawFlow[rawFlow.length-1]:{};
  history=traffic&&Array.isArray(traffic.vitals)?traffic.vitals.filter(function(s){return s.t>=flowNow-WINDOW_MS;}):[];
  var sample=history.length&&flowNow-history[history.length-1].t<=10000?history[history.length-1]:{};
  var mem={total:sample.memoryTotal},sensor=Number.isFinite(sample.temperature)?{value:sample.temperature}:null;
@@ -488,9 +493,10 @@ return view.extend({
  vitals.style.setProperty('--hd-card-count',Array.from(vitals.children).filter(function(card){return !card.hidden;}).length);
  text(refs.memDetail,bytes(mem.total*(sample.mem||0)/100)+' / '+bytes(mem.total));
  ['down','up'].forEach(function(k){text(refs[k+'Legend'],live[k]==null?'—':rate(live[k]));});
- var scale=plot(canvas,flow,['up','down'],['var(--hd-secondary)','var(--hd-blue)'],'hd-main',false);if(!flow.some(function(s){return s.up!=null;}))canvas.appendChild(E('div',{class:'hd-chart-empty'},!traffic?_('Traffic sampling service unavailable','pulse'):dev?_('Waiting for traffic samples…','pulse'):_('Selected device unavailable','pulse')));
- yaxis.replaceChildren();for(var level=0;level<=4;level++)yaxis.appendChild(E('span',{style:'top:'+((10+level*165/4)/180*100)+'%'},Number((scale.step*(4-level)).toPrecision(12))+' '+scale.unit));
- markTrafficPeak(canvas,flow,scale.ceiling);hoverCeiling=scale.ceiling;renderHover();text(refs.chartSub,_('Last 5 minutes','pulse'));text(refs.start,clock((flow.length?flow[flow.length-1].t:flowNow)-WINDOW_MS));text(refs.end,clock(flow.length?flow[flow.length-1].t:flowNow));text(refs.sent,bytes(dev&&dev.stats&&dev.stats.tx_bytes));text(refs.received,bytes(dev&&dev.stats&&dev.stats.rx_bytes));
+ drawFlow=visualTraffic(flow);
+ var scale=plot(canvas,drawFlow,['up','down'],['var(--hd-secondary)','var(--hd-blue)'],'hd-main',false);if(!flow.some(function(s){return s.up!=null;}))canvas.appendChild(E('div',{class:'hd-chart-empty'},!traffic?_('Traffic sampling service unavailable','pulse'):dev?_('Waiting for traffic samples…','pulse'):_('Selected device unavailable','pulse')));
+ yaxis.replaceChildren();for(var level=0;level<=scale.ticks;level++)yaxis.appendChild(E('span',{style:'top:'+((10+level*165/scale.ticks)/180*100)+'%'},Number((scale.step*(scale.ticks-level)).toPrecision(12))+' '+scale.unit));
+ markTrafficPeak(canvas,drawFlow,scale.ceiling);hoverCeiling=scale.ceiling;renderHover();text(refs.chartSub,_('Last 1 minute','pulse'));text(refs.start,clock((flow.length?flow[flow.length-1].t:flowNow)-TRAFFIC_WINDOW_MS));text(refs.end,clock(flow.length?flow[flow.length-1].t:flowNow));text(refs.sent,bytes(dev&&dev.stats&&dev.stats.tx_bytes));text(refs.received,bytes(dev&&dev.stats&&dev.stats.rx_bytes));
  var names=sortPorts(d[9]||[],devices,ifs);
  var portKey=JSON.stringify([d[12],names.map(function(n){var link=(devices[n]||{}).link||{};return [n,link.carrier,link.speed,deviceNetworks(n,devices,ifs)];})]);
  if(portKey!==portSignature){
@@ -519,7 +525,7 @@ return view.extend({
  big.addEventListener('pointermove',function(e){
   var box=canvas.getBoundingClientRect();
   if(!flow.length||e.clientX<box.left||e.clientX>box.right){hideHover();return;}
-  var target=flow[flow.length-1].t-WINDOW_MS+(e.clientX-box.left)/box.width*WINDOW_MS;
+  var target=flow[flow.length-1].t-TRAFFIC_WINDOW_MS+(e.clientX-box.left)/box.width*TRAFFIC_WINDOW_MS;
   var sample=flow.reduce(function(a,b){return Math.abs(b.t-target)<Math.abs(a.t-target)?b:a;});
   if(Math.abs(sample.t-target)>3000){hideHover();return;}
   hoverTime=sample.t;renderHover();

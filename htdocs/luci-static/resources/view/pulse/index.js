@@ -80,7 +80,7 @@ function loadTraffic(data){
  return Promise.all([L.resolveDefault(trafficRPC(device),null),loadDocker(),loadZones()]).then(function(results){return data.slice(0,10).concat(results);});
 }
 // Generated from Makefile; generate-version.sh refreshes this on build/deploy.
-var VERSION='1.0.1'; // @pulse-version
+var VERSION='1.0.2'; // @pulse-version
 var NS='http://www.w3.org/2000/svg', WINDOW_MS=5*60*1000, TRAFFIC_WINDOW_MS=1*60*1000;
 function svg(tag, attrs) { var n=document.createElementNS(NS,tag); Object.keys(attrs||{}).forEach(function(k){n.setAttribute(k,attrs[k]);}); return n; }
 function bytes(v) { if(v==null||!isFinite(v)) return '—'; var u=['B','KB','MB','GB','TB'],i=0; while(v>=1024&&i<4){v/=1024;i++;} return (v<10&&i?v.toFixed(2):v<100&&i?v.toFixed(1):Math.round(v))+' '+u[i]; }

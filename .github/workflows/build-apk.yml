@@ -30,16 +30,19 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: 检查版本
         run: |
           set -euo pipefail
-          VERSION=$(sed -n 's/^PKG_VERSION[[:space:]]*:=[[:space:]]*//p' Makefile | tr -d '\r')
-          sh ./generate-version.sh
-          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v${VERSION}" ]]; then
-            echo "::error::标签 ${GITHUB_REF_NAME} 与 Makefile 版本 ${VERSION} 不一致"
+          RELEASE=$(sed -n 's/^PULSE_RELEASE[[:space:]]*:=[[:space:]]*//p' Makefile | tr -d '\r')
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$GITHUB_REF_NAME" != "v${RELEASE}" ]]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match release ${RELEASE}"
             exit 1
           fi
+          VERSION=$(sh ./generate-version.sh --resolve "$RELEASE")
+          echo "PULSE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          sh ./generate-version.sh --write "$VERSION"
           echo "Pulse version: ${VERSION}"
 
       - name: 安装依赖

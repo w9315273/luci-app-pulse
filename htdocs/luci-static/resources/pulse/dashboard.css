@@ -42,7 +42,7 @@
  .hd .hd-mini {height:clamp(22px,3vh,34px);margin-top:3px}
  .hd .hd-middle {margin-top:10px}
  .hd .hd-card-head {padding:10px 16px 0;gap:8px}
- .hd .hd-chart {height:clamp(116px,calc(100dvh - 574px),476px);margin:10px 12px 0}
+ .hd .hd-chart {margin:10px 12px 0}
  .hd .hd-axis {margin:3px 16px 0}
  .hd .hd-foot {margin:7px 16px 0;padding:7px 0 9px;gap:12px}
  .hd .hd-stat {font-size:15px;margin-top:3px}
@@ -326,3 +326,15 @@
 .hd .hd-port > .hd-port-heading {width:100%;min-width:0}
 .hd .hd-port:last-child,
 .hd .hd-container:last-child {border-bottom:1px solid transparent}
+
+/* Let the theme allocate page space; only the main chart grows within it. */
+@media(min-width:1101px){
+ #maincontent:has(#view > .hd),#view:has(> .hd) {display:flex;flex-direction:column;flex:1}
+ #view > .hd {flex:1}
+ .hd > .hd-vitals,.hd > section.hd-strip {flex-shrink:0}
+ .hd > .hd-middle {flex:1}
+ .hd .hd-flow-card {display:flex;flex-direction:column}
+ .hd .hd-flow-card > .hd-card-head,.hd .hd-flow-card > .hd-axis {flex-shrink:0}
+ .hd .hd-chart {height:auto;min-height:116px;flex:1 0 116px}
+ .hd .hd-plot {position:absolute;inset:0 0 0 68px;height:auto;margin-left:0}
+}

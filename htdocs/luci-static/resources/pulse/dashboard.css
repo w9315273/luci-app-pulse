@@ -306,11 +306,11 @@
 .hd .hd-tile-head .hd-icon {display:inline-flex;align-items:center;justify-content:center;width:19px;height:20px;flex:0 0 19px;line-height:1}
 .hd .hd-tile-title {line-height:20px}
 
-/* Place the version within the existing bottom padding, without a new row. */
+/* Size and center the ancillary version within the shared page padding. */
 .hd {position:relative}
-.hd .hd-version {position:absolute;right:var(--hd-page-space);bottom:0;font-size:9px;line-height:12px;font-weight:400;color:var(--hd-muted);white-space:nowrap;opacity:.8}
+.hd .hd-version {position:absolute;right:var(--hd-page-space);bottom:0;display:flex;align-items:center;height:var(--hd-page-space);font-size:calc(var(--hd-page-space) * .65);line-height:1;font-weight:400;color:var(--hd-muted);white-space:nowrap;opacity:.8;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
-.hd .hd-version a {display:inline-flex;align-items:center;gap:4px;color:inherit;text-decoration:none}
+.hd .hd-version a {display:inline-flex;align-items:center;gap:.35em;font:inherit;color:inherit;text-decoration:none}
 .hd .hd-version a:hover {color:var(--hd-blue)}
 .hd .hd-version a:focus-visible {outline:1px solid var(--hd-blue);outline-offset:2px;border-radius:2px}
 

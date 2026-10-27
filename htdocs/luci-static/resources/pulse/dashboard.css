@@ -26,7 +26,6 @@
 @media(max-width:1100px){.hd .hd-vitals{grid-template-columns:repeat(2,minmax(0,1fr))}.hd .hd-middle{grid-template-columns:1fr}.hd .hd-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.hd .hd-strip>div+div{border:0;padding:0}}
 @media(max-width:600px){.hd{padding:14px;border-radius:10px}.hd .hd-top{margin-bottom:16px}.hd h2{font-size:21px}.hd .hd-value{font-size:27px}.hd .hd-tile-head,.hd .hd-detail,.hd .hd-value{padding-left:14px;padding-right:14px}.hd .hd-tile-foot{padding-left:14px;padding-right:14px}.hd .hd-chart{height:190px}.hd .hd-foot{grid-template-columns:1fr}.hd .hd-foot>div+div{border:0;padding:0}.hd .hd-strip{grid-template-columns:1fr}.hd .hd-bottom{flex-direction:column;gap:4px}.hd .hd-legend{flex-wrap:wrap}}
 
-/* Compact desktop layout: leave room for LuCI navigation and footer. */
 @media (min-width:1101px) {
  .hd {display:flex!important;flex-direction:column;padding:12px 16px;border-radius:12px;margin-top:0}
  .hd section.hd-card {margin:0}
@@ -179,7 +178,6 @@
 .hd .hd-copy-notice[hidden] {display:none}
 .hd-copy-input {position:fixed;left:-9999px;top:0;opacity:0}
 
-/* Three balanced groups: uptime, connection, network addresses. */
 .hd section.hd-strip {grid-template-columns:minmax(115px,.8fr) minmax(230px,1.15fr) minmax(0,3.05fr);align-items:center;padding:14px 18px;gap:20px}
 .hd .hd-strip > div+div {padding-left:20px;border-left:1px solid var(--hd-line)}
 .hd .hd-strip .hd-label {font-size:12px}
@@ -211,7 +209,6 @@
  .hd > section.hd-strip {order:3;margin:10px 0 0}
 }
 
-/* Shared spacing scale for the page, cards and status strip. */
 .hd {--hd-page-space:16px;--hd-card-space:12px;--hd-layout-gap:12px;display:flex!important;flex-direction:column;gap:var(--hd-layout-gap);padding:var(--hd-page-space)}
 .hd > .hd-middle,.hd > section.hd-strip {margin:0}
 .hd .hd-grid,.hd .hd-vitals {gap:var(--hd-layout-gap)}
@@ -263,9 +260,11 @@
 
 .hd .hd-container-name-text {display:inline-block;white-space:nowrap}
 .hd .hd-name-scrolling {overflow-x:hidden}
-.hd .hd-name-scrolling .hd-container-name-text {animation:hd-container-scroll var(--hd-name-duration) ease-in-out infinite}
-@keyframes hd-container-scroll {0%,5%,100%{transform:translateX(0)}45%,55%{transform:translateX(var(--hd-name-shift))}}
-@media(prefers-reduced-motion:reduce){.hd .hd-name-scrolling {overflow-x:auto}.hd .hd-name-scrolling .hd-container-name-text {animation:none}}
+.hd .hd-name-track {display:inline-flex;align-items:center;gap:24px;width:max-content;vertical-align:middle}
+.hd .hd-name-track > .hd-container-name-text {flex:none}
+.hd .hd-name-scrolling .hd-name-track {animation:hd-container-scroll var(--hd-name-duration) linear infinite}
+@keyframes hd-container-scroll {from{transform:translateX(0)}to{transform:translateX(var(--hd-name-shift))}}
+@media(prefers-reduced-motion:reduce){.hd .hd-name-scrolling {overflow-x:auto}.hd .hd-name-scrolling .hd-name-track {animation:none}.hd .hd-name-copy {display:none}}
 
 .hd .hd-port .hd-port-summary {white-space:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overflow-wrap:normal;min-width:0}
 .hd .hd-port-summary::-webkit-scrollbar {display:none}
@@ -297,7 +296,6 @@
 .hd .hd-port-summary .hd-port-name {display:inline-block;vertical-align:middle;overflow:visible;color:var(--hd-text);margin-right:6px}
 .hd .hd-port-heading > .hd-badge {flex-shrink:0}
 
-/* Inactive devices are muted; firewall zone colors retain their meaning. */
 .hd .hd-port-offline .hd-port-name {color:var(--hd-muted)}
 .hd .hd-container-stopped .hd-container-name,
 .hd .hd-container-stopped .hd-container-name-text,
@@ -306,7 +304,6 @@
 .hd .hd-tile-head .hd-icon {display:inline-flex;align-items:center;justify-content:center;width:19px;height:20px;flex:0 0 19px;line-height:1}
 .hd .hd-tile-title {line-height:20px}
 
-/* Size and center the ancillary version within the shared page padding. */
 .hd {position:relative}
 .hd .hd-version {position:absolute;right:var(--hd-page-space);bottom:0;display:flex;align-items:center;height:var(--hd-page-space);font-size:calc(var(--hd-page-space) * .65);line-height:1;font-weight:400;color:var(--hd-muted);white-space:nowrap;opacity:.8;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
@@ -314,11 +311,9 @@
 .hd .hd-version a:hover {color:var(--hd-blue)}
 .hd .hd-version a:focus-visible {outline:1px solid var(--hd-blue);outline-offset:2px;border-radius:2px}
 
-/* Scope the Argon icon override to this plugin's menu entry. */
 .main-left .nav > li > a[href$="/admin/dashboard"]:first-child .menu-icon,
 .main-left .nav > li > a[href$="/admin/dashboard"]:first-child::before {color:#3b82f6}
 
-/* Shared list geometry keeps port and container separators aligned. */
 .hd .hd-ports-card > .hd-card-head,
 .hd .hd-docker-card > .hd-card-head {height:56px;min-height:56px;align-content:flex-start}
 .hd .hd-port,
@@ -327,7 +322,6 @@
 .hd .hd-port:last-child,
 .hd .hd-container:last-child {border-bottom:1px solid transparent}
 
-/* Let the theme allocate page space; only the main chart grows within it. */
 @media(min-width:1101px){
  #maincontent:has(#view > .hd),#view:has(> .hd) {display:flex;flex-direction:column;flex:1}
  #view > .hd {flex:1}

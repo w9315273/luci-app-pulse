@@ -95,6 +95,7 @@ jobs:
           SDK_ROOT="${RUNNER_TEMP}/pulse-sdk"
           mkdir -p "$SDK_CACHE" "$SDK_ROOT"
           cd "$SDK_CACHE"
+          # 缓存命中也校验官方摘要；缺失或损坏时重新下载。
           if ! printf '%s  %s\n' "$SDK_SHA" "$SDK_TARBALL" | sha256sum -c -; then
             curl -fSL --retry 3 "$SDK_URL" -o "$SDK_TARBALL"
           fi
@@ -112,11 +113,12 @@ jobs:
           restore-keys: |
             pulse-dl-v1-${{ runner.os }}-${{ steps.sdk.outputs.sha256 }}-
 
-      - name: 构建插件
+      - name: 构建插件和翻译包
         run: |
           set -euo pipefail
           cd "$SDK_DIR"
           mkdir -p "package/$PKG_DIR_NAME"
+          # 仅复制构建必需文件，不包含本地工具和工作流。
           cp "$GITHUB_WORKSPACE/Makefile" "$GITHUB_WORKSPACE/generate-version.sh" "package/$PKG_DIR_NAME/"
           cp -R "$GITHUB_WORKSPACE/htdocs" "$GITHUB_WORKSPACE/root" "$GITHUB_WORKSPACE/po" "package/$PKG_DIR_NAME/"
           ./scripts/feeds update -a
@@ -130,22 +132,50 @@ jobs:
           CONFIG_ALL_NONSHARED=n
           CONFIG_PACKAGE_luci-app-pulse=m
           CONFIG
+          # Follow the SDK's language aliases (for example zh_Hans -> zh-cn).
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import os, re
+          luci = Path('feeds/luci/luci.mk').read_text()
+          supported = set(re.findall(r'^LUCI_LANG\.([\w]+)\s*[:?+]?=', luci, re.M))
+          aliases = dict(re.findall(r'^LUCI_LC_ALIAS\.([\w]+)\s*:?=\s*([\w-]+)', luci, re.M))
+          packages = ['luci-app-pulse']
+          with Path('.config').open('a') as config:
+              for directory in sorted(Path('package/luci-app-pulse/po').iterdir()):
+                  if not directory.is_dir() or directory.name == 'templates':
+                      continue
+                  lang = directory.name
+                  if lang not in supported:
+                      raise SystemExit(f'Unsupported LuCI language directory: {lang}')
+                  if not list(directory.glob('*.po')):
+                      raise SystemExit(f'No translation sources: {lang}')
+                  package = 'luci-i18n-pulse-' + aliases.get(lang, lang)
+                  packages.append(package)
+                  config.write(f'CONFIG_LUCI_LANG_{lang}=y\nCONFIG_PACKAGE_{package}=m\n')
+          Path(os.environ['RUNNER_TEMP'], 'pulse-packages').write_text('\n'.join(packages) + '\n')
+          PYTHON
           make defconfig
-          grep -Eq '^CONFIG_PACKAGE_luci-app-pulse=(y|m)$' .config || {
-            echo '::error::luci-app-pulse 未启用'
-            exit 1
-          }
+          while IFS= read -r package; do
+            grep -Eq "^CONFIG_PACKAGE_${package}=(y|m)$" .config || {
+              echo "::error::${package} 未启用"
+              grep -n -F "$package" .config tmp/.packageinfo || true
+              sed -n "/^[[:space:]]*config PACKAGE_${package}\$/,/^[[:space:]]*config /p" tmp/.config-package.in
+              exit 1
+            }
+          done < "$RUNNER_TEMP/pulse-packages"
           make "package/${PKG_DIR_NAME}/compile" -j"$(nproc)" V=sc
 
       - name: 整理产物
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          mapfile -t files < <(find "$SDK_DIR/bin/packages" -type f -name "${PKG_DIR_NAME}-*.apk")
-          if (( ${#files[@]} == 0 )); then
-            echo "::error::缺少 ${PKG_DIR_NAME} APK"; exit 1
-          fi
-          cp "${files[@]}" "$GITHUB_WORKSPACE/dist/"
+          while IFS= read -r package; do
+            mapfile -t files < <(find "$SDK_DIR/bin/packages" -type f -name "${package}-*.apk")
+            if (( ${#files[@]} == 0 )); then
+              echo "::error::缺少 ${package} APK"; exit 1
+            fi
+            cp "${files[@]}" "$GITHUB_WORKSPACE/dist/"
+          done < "$RUNNER_TEMP/pulse-packages"
 
       - name: 上传产物
         uses: actions/github-script@v9
@@ -155,9 +185,11 @@ jobs:
             const path = require('node:path');
             const { execFileSync } = require('node:child_process');
             const { pathToFileURL } = require('node:url');
+            // Same official SDK used by upload-artifact v7; each file stays unarchived.
             const tools = path.join(process.env.RUNNER_TEMP, 'pulse-artifact-tools');
             execFileSync('npm', ['install', '--prefix', tools, '--no-audit', '--no-fund',
               '--ignore-scripts', '@actions/artifact@6.3.1'], { stdio: 'inherit' });
+            // Resolve the SDK through its public ESM export from beside node_modules.
             const loader = path.join(tools, 'artifact-loader.mjs');
             await fs.writeFile(loader, "export { DefaultArtifactClient } from '@actions/artifact';\n");
             const { DefaultArtifactClient } = await import(pathToFileURL(loader).href);

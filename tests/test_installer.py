@@ -36,7 +36,7 @@ class InstallerTests(unittest.TestCase):
         # PATH 仅允许桩命令和少量标准工具, 桩不可执行时也不会误用宿主机的 apk.
         for name in ('grep', 'wc', 'sha256sum', 'mktemp', 'rm'):
             command = shutil.which(name)
-            self.assertIsNotNone(command, f'Required test tool: {name}')
+            self.assertIsNotNone(command, f'缺少测试工具: {name}')
             (self.bin / name).symlink_to(command)
         (self.bin / 'python3').symlink_to(sys.executable)
         self.env = dict(os.environ, PATH=str(self.bin), FIXTURES=str(self.assets),
@@ -53,7 +53,7 @@ class InstallerTests(unittest.TestCase):
             'rm -f /tmp/luci-indexcache /tmp/luci-indexcache.* /tmp/luci-modulecache/*': 'rm -f "$TEST_CACHE"',
         }
         for old, new in replacements.items():
-            self.assertIn(old, source, f'Installer boundary changed: {old}')
+            self.assertIn(old, source, f'安装脚本边界已变更: {old}')
             source = source.replace(old, new)
         self.assertNotIn('/etc/init.d/', source)
         self.assertNotIn('/tmp/', source)
@@ -80,7 +80,7 @@ class InstallerTests(unittest.TestCase):
         result = subprocess.run(['/bin/sh', str(self.script)], env=self.env,
                                 capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
-        self.assertEqual(list(self.work.iterdir()), [], 'Temporary downloads were not cleaned')
+        self.assertEqual(list(self.work.iterdir()), [], '临时下载文件未清理')
         return result, [json.loads(line) for line in self.calls.read_text().splitlines()]
 
     def assert_not_installed(self, calls):
@@ -88,6 +88,7 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(self.cache.exists())
 
     def test_install_all_available_translations_and_ignore_other_assets(self):
+        """安装主包和所有可用翻译包, 忽略无关资产."""
         self.metadata(self.names + ['luci-app-other-1.0.apk', 'SHA256SUMS'])
         _, calls = self.execute(True)
         installs = [call for call in calls if call[0] == 'apk']
@@ -102,12 +103,14 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(self.cache.exists())
 
     def test_release_without_translation_assets(self):
+        """没有翻译包时仍能安装主包."""
         self.metadata(self.names[:1])
         _, calls = self.execute(True)
         install = next(call for call in calls if call[0] == 'apk')
         self.assertEqual([Path(name).name for name in install[3:]], self.names[:1])
 
     def test_failed_install_does_not_restart_services_or_clear_cache(self):
+        """安装失败时不重启服务或清除缓存."""
         self.env['APK_FAIL'] = '1'
         result, calls = self.execute(False)
         self.assertTrue(any(call[0] == 'apk' for call in calls))
@@ -116,6 +119,7 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn('Done.', result.stdout)
 
     def test_failed_download_never_installs_partial_packages(self):
+        """下载失败时不安装不完整的包集合."""
         for name in ('release.json', self.names[-1]):
             with self.subTest(name=name):
                 self.calls.write_text('')
@@ -124,6 +128,7 @@ class InstallerTests(unittest.TestCase):
                 self.assert_not_installed(calls)
 
     def test_invalid_or_missing_digest_never_installs(self):
+        """摘要缺失, 格式错误或校验不符时终止安装."""
         for digest in (None, 'sha256:123', 'sha256:' + 'z' * 64, 'sha256:' + '0' * 64, 'md5:' + '0' * 32):
             with self.subTest(digest=digest):
                 self.calls.write_text('')
@@ -134,6 +139,7 @@ class InstallerTests(unittest.TestCase):
                 self.assert_not_installed(calls)
 
     def test_missing_or_ambiguous_main_package_never_installs(self):
+        """主包缺失或存在多个候选时终止安装."""
         for names in ([], self.names[1:], self.names + ['luci-app-pulse-9.9.9-r1.apk']):
             with self.subTest(names=names):
                 self.calls.write_text('')
@@ -142,6 +148,7 @@ class InstallerTests(unittest.TestCase):
                 self.assert_not_installed(calls)
 
     def test_unrelated_download_host_is_rejected(self):
+        """拒绝无关域名的下载地址."""
         assets = self.metadata(self.names[:1])
         assets[0]['browser_download_url'] = 'https://example.invalid/' + self.names[0]
         self.write_metadata(assets)
@@ -149,6 +156,7 @@ class InstallerTests(unittest.TestCase):
         self.assert_not_installed(calls)
 
     def test_non_root_install_stops_before_download(self):
+        """非 root 用户在下载前终止安装."""
         self.env['MOCK_UID'] = '1000'
         _, calls = self.execute(False)
         self.assertEqual(calls, [['id', '-u']])

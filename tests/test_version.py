@@ -36,6 +36,7 @@ class VersionTests(unittest.TestCase):
         return result.stdout.strip()
 
     def test_resolve_without_git_and_with_override(self):
+        """无 Git 历史时正确解析版本并支持显式覆盖."""
         self.assertFalse((self.repo / '.git').exists())
         self.assertEqual(self.run_command(['sh', 'generate-version.sh', '--resolve', self.release]), self.release)
         env = dict(self.env, PULSE_VERSION='1.2.3_git4')
@@ -46,6 +47,7 @@ class VersionTests(unittest.TestCase):
                 self.run_command(['sh', 'generate-version.sh', '--resolve', invalid], success=False)
 
     def test_write_validates_version_and_unique_marker(self):
+        """写入版本前校验版本格式和唯一标记."""
         self.run_command(['sh', 'generate-version.sh', '--write', '1.2.3_git4'])
         self.assertIn("VERSION='1.2.3_git4'", self.output.read_text())
         before = self.output.read_text()
@@ -58,6 +60,7 @@ class VersionTests(unittest.TestCase):
                 self.assertEqual(self.output.read_text(), content)
 
     def test_git_history_does_not_change_configured_version(self):
+        """Git 历史及浅克隆不会改变配置的版本号."""
         self.run_command(['git', 'init', '-q'])
         self.run_command(['git', 'config', 'user.name', 'Test'])
         self.run_command(['git', 'config', 'user.email', 'test@example.invalid'])
@@ -71,6 +74,7 @@ class VersionTests(unittest.TestCase):
                          self.release)
 
     def test_makefile_passes_version_into_frontend(self):
+        """Makefile 将正确版本写入前端."""
         # 用最小 SDK 骨架运行真实 Makefile, 验证构建钩子而非重复版本计算逻辑.
         sdk = self.root / 'sdk'
         (sdk / 'feeds/luci').mkdir(parents=True)
@@ -88,6 +92,7 @@ class VersionTests(unittest.TestCase):
                 self.assertIn(f"VERSION='{expected}'", self.output.read_text())
 
     def test_workflow_accepts_only_matching_release_tags(self):
+        """工作流仅接受与版本及修订号匹配的发布标签."""
         # 执行工作流中的原始 shell 步骤, 标签规则只保留一份实现.
         workflow = (ROOT / '.github/workflows/build-apk.yml').read_text()
         marker = '      - name: 检查版本\n        run: |\n'

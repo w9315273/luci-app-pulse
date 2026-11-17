@@ -28,18 +28,18 @@ elif command == 'jsonfilter':
     else:
         match = re.fullmatch(r'@\.assets\[@\.name="([^"]+)"\]\.digest', expression)
         if not match:
-            raise SystemExit(f'Unexpected jsonfilter expression: {expression}')
+            raise SystemExit(f'非预期的 jsonfilter 表达式: {expression}')
         for asset in assets:
             if asset['name'] == match[1] and asset.get('digest') is not None:
                 print(asset['digest'])
 elif command == 'apk':
     if args[:2] != ['add', '--allow-untrusted']:
-        raise SystemExit(f'Unexpected apk operation: {args}')
+        raise SystemExit(f'非预期的 apk 操作: {args}')
     if not args[2:] or not all(Path(name).is_file() for name in args[2:]):
-        raise SystemExit('Missing package files')
+        raise SystemExit('缺少软件包文件')
     sys.exit(int(os.environ.get('APK_FAIL', '0')))
 elif command == 'mock-service':
     if args not in [['pulse-traffic', 'enable'], ['pulse-traffic', 'restart'], ['rpcd', 'reload']]:
-        raise SystemExit(f'Unexpected service operation: {args}')
+        raise SystemExit(f'非预期的服务操作: {args}')
 else:
-    raise SystemExit(f'Unexpected command: {command}')
+    raise SystemExit(f'非预期的命令: {command}')

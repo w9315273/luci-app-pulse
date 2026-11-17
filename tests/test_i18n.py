@@ -26,14 +26,14 @@ def read_po(path):
             elif line.startswith('"') and key:
                 fields[key] += ast.literal_eval(line)
             else:
-                raise AssertionError(f'{path}: unsupported PO entry: {line}')
+                raise AssertionError(f'{path}: 不支持的 PO 条目: {line}')
         if not fields.get('msgid'):
             continue
         identity = (fields.get('msgctxt'), fields['msgid'])
         if identity in entries:
-            raise AssertionError(f'{path}: duplicate message: {identity}')
+            raise AssertionError(f'{path}: 重复文案: {identity}')
         if re.search(r'^#,.*\bfuzzy\b', block, re.M):
-            raise AssertionError(f'{path}: fuzzy message: {identity}')
+            raise AssertionError(f'{path}: 尚未确认的模糊翻译: {identity}')
         entries[identity] = fields.get('msgstr', '')
     return entries
 
@@ -46,6 +46,7 @@ def messages_from_js(source):
 
 class TranslationTests(unittest.TestCase):
     def test_source_messages_match_template(self):
+        """界面文案与翻译模板一致."""
         messages = set()
         for path in (ROOT / 'htdocs').rglob('*.js'):
             messages.update(messages_from_js(path.read_text()))
@@ -56,21 +57,23 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual(messages, set(read_po(ROOT / 'po/templates/pulse.pot')))
 
     def test_all_languages_have_complete_messages_and_placeholders(self):
+        """所有语言的文案完整且占位符一致."""
         template = read_po(ROOT / 'po/templates/pulse.pot')
         catalogs = sorted(path for path in (ROOT / 'po').glob('*/pulse.po') if path.parent.name != 'templates')
-        self.assertTrue(catalogs, 'No translation catalogs')
+        self.assertTrue(catalogs, '没有找到翻译目录')
         for catalog in catalogs:
             with self.subTest(language=catalog.parent.name):
                 messages = read_po(catalog)
                 self.assertEqual(set(messages), set(template))
                 for (_, original), translated in messages.items():
                     with self.subTest(message=original):
-                        self.assertTrue(translated.strip(), 'Empty translation')
+                        self.assertTrue(translated.strip(), '翻译为空')
                         self.assertEqual(Counter(PLACEHOLDER.findall(original)),
                                          Counter(PLACEHOLDER.findall(translated)))
                         self.assertEqual(original, original.strip())
 
     def test_chinese_comments_do_not_create_translation_entries(self):
+        """中文代码注释不会被误识别为待翻译文案."""
         source = '''// 中文注释, _('Ignored', 'pulse').
         /* 中文注释, _('Also ignored', 'pulse'). */
         const url = 'https://example.invalid/';

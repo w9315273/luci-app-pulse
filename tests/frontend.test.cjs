@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'htdocs/luci-static/resources/view/pulse/index.js'), 'utf8');
 const boundary = 'return view.extend({';
-assert.equal(source.split(boundary).length, 2, 'LuCI view boundary changed');
+assert.equal(source.split(boundary).length, 2, 'LuCI 视图边界已变更, 请更新测试适配器');
 const helperNames = [
  'defaultDevice', 'visibleDeviceNames', 'deviceNetworks', 'deviceAddresses',
  'loadTraffic', 'prefs', 'visualTraffic', 'smoothPath', 'trafficScale', 'trafficPeak'
@@ -58,14 +58,14 @@ function harness(data = fixture(), saved = new Map()) {
  // DNS 仍在 update 内, 截取实际显示逻辑, 不在测试中复制实现.
  const dnsStart = source.indexOf(' var networks=deviceNetworks(selected,devices,ifs),related=');
  const dnsEnd = source.indexOf(" updateAddresses('ipv4'", dnsStart);
- assert.ok(dnsStart >= 0 && dnsEnd > dnsStart, 'DNS block changed; update the test adapter');
+ assert.ok(dnsStart >= 0 && dnsEnd > dnsStart, 'DNS 代码结构已变更, 请更新测试适配器');
  const dns = evaluate('return function(selected, devices, ifs, d) {\n' +
   source.split(boundary)[0] + '\n' + source.slice(dnsStart, dnsEnd) +
   '\nreturn {addresses: Array.from(new Set(dns)), label: dnsLabel};\n};');
  return { helpers, page, requests, localStorage, dns: device => dns(device, data[0], data[1], data) };
 }
 
-test('all LuCI JavaScript modules compile', () => {
+test('所有 LuCI JavaScript 模块通过语法检查', () => {
  const visit = directory => {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
    const file = path.join(directory, entry.name);
@@ -76,7 +76,7 @@ test('all LuCI JavaScript modules compile', () => {
  visit(path.join(root, 'htdocs'));
 });
 
-test('tabs keep independent choices while sharing saved preferences', async () => {
+test('多标签页共享已保存偏好, 但各自保持独立的接口选择', async () => {
  const data = fixture(), saved = new Map([['pulse.device', 'eth0']]);
  const first = harness(data, saved), second = harness(data, saved);
  // 在首个页面请求尚未完成时修改共享偏好, 覆盖初始化时的竞争情况.
@@ -93,14 +93,14 @@ test('tabs keep independent choices while sharing saved preferences', async () =
  }
 });
 
-test('blocked storage does not override manual selection', async () => {
+test('本地存储不可用时仍保留手动接口选择', async () => {
  const data = fixture(), { helpers, localStorage } = harness(data);
- localStorage.getItem = () => { throw new Error('Storage blocked'); };
+ localStorage.getItem = () => { throw new Error('本地存储不可用'); };
  assert.equal(helpers.prefs(), '');
  assert.equal((await helpers.loadTraffic(data, 'macvlan1'))[10].device, 'macvlan1');
 });
 
-test('automatic, removed and empty device selections fall back safely', async () => {
+test('自动选择, 接口消失和无设备时正确回退', async () => {
  const data = fixture(), { helpers } = harness(data);
  for (const choice of ['', 'removed-device']) {
   assert.equal((await helpers.loadTraffic(data, choice))[10].device, 'macvlan0');
@@ -111,7 +111,7 @@ test('automatic, removed and empty device selections fall back safely', async ()
  assert.equal((await helpers.loadTraffic(data, 'macvlan1'))[10].device, '');
 });
 
-test('automatic selection prefers exact WAN, then WAN prefix, then default route', () => {
+test('自动选择依次优先 WAN, WAN 前缀和默认路由', () => {
  const data = fixture(), { helpers: h } = harness(data);
  const names = h.visibleDeviceNames(data[0]);
  assert.ok(!names.includes('lo') && !names.includes('veth123'));
@@ -124,7 +124,7 @@ test('automatic selection prefers exact WAN, then WAN prefix, then default route
  assert.equal(h.defaultDevice([], []), '');
 });
 
-test('macvlan parent aggregates IPs and DNS without leaking into child interfaces', () => {
+test('父网口汇总 macvlan 的 IP 和 DNS, 子接口保持独立', () => {
  const data = fixture(), { helpers: h, dns } = harness(data);
  assert.deepEqual(h.deviceNetworks('eth1', data[0], data[1]), ['wan2', 'WAN']);
  assert.deepEqual(h.deviceAddresses('eth1', data[0], data[1], 4), [
@@ -140,7 +140,7 @@ test('macvlan parent aggregates IPs and DNS without leaking into child interface
  assert.deepEqual(dns('eth0'), { addresses: [], label: '' });
 });
 
-test('bridge membership, DSA isolation and cyclic parent protection', () => {
+test('正确识别网桥归属, 隔离 DSA 并防止父设备循环', () => {
  const data = fixture(), { helpers: h, dns } = harness(data);
  data[1][2]['dns-server'] = ['192.0.2.53'];
  assert.deepEqual(h.deviceNetworks('eth2', data[0], data[1]), ['lan']);
@@ -151,7 +151,7 @@ test('bridge membership, DSA isolation and cyclic parent protection', () => {
  assert.deepEqual(h.deviceNetworks('missing', devices, [{ device: 'loopA', interface: 'loop' }]), []);
 });
 
-test('visual smoothing preserves raw readings and stays within neighbouring values', () => {
+test('曲线平滑保留原始读数, 且不超出相邻采样范围', () => {
  const { helpers: h } = harness();
  const raw = [100, 900, 300, 0, 800].map((up, i) =>
   Object.freeze({ t: i * 1000, up, down: up / 2, interval: 1 }));
@@ -171,7 +171,7 @@ test('visual smoothing preserves raw readings and stays within neighbouring valu
  });
 });
 
-test('missing samples and time gaps never borrow values from another segment', () => {
+test('缺失采样和时间间隔不会跨段平滑', () => {
  const { helpers: h } = harness();
  const sample = (t, value) => ({ t, up: value, down: value, interval: 1 });
  const input = [sample(1000, 100), sample(2000, null), sample(3000, 900), sample(12000, 10)];
@@ -183,7 +183,7 @@ test('missing samples and time gaps never borrow values from another segment', (
  }
 });
 
-test('empty and zero traffic have valid peaks, scales and SVG paths', () => {
+test('空数据和零流量的峰值, 刻度及 SVG 路径有效', () => {
  const { helpers: h } = harness();
  assert.deepEqual(h.visualTraffic([]), []);
  assert.equal(h.trafficPeak([], 'up'), null);

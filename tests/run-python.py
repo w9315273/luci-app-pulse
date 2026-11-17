@@ -1,6 +1,21 @@
 from pathlib import Path
+import re
 import sys
 import unittest
+
+
+class TimingStream:
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, text):
+        # 仅格式化汇总行, 不改变断言失败时的原始数值.
+        text = re.sub(r'^(Ran \d+ tests? in )(\d+(?:\.\d+)?)s$',
+                      lambda match: f'{match[1]}{float(match[2]):.2f}s', text, flags=re.M)
+        return self.stream.write(text)
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
 
 
 class ChineseResult(unittest.TextTestResult):
@@ -15,7 +30,7 @@ class ChineseResult(unittest.TextTestResult):
 
 if __name__ == '__main__':
     suite = unittest.defaultTestLoader.discover(str(Path(__file__).resolve().parent), pattern='test_*.py')
-    result = unittest.TextTestRunner(resultclass=ChineseResult, verbosity=2).run(suite)
+    result = unittest.TextTestRunner(stream=TimingStream(sys.stderr), resultclass=ChineseResult, verbosity=2).run(suite)
     if result.wasSuccessful():
         print(f'Python 回归测试完成: {result.testsRun} 项全部通过.', flush=True)
     else:
